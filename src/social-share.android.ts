@@ -4,6 +4,7 @@ import * as platform from "tns-core-modules/platform";
 let context;
 let numberOfImagesCreated = 0;
 declare var global: any;
+const REQUEST_CODE = 99
 const FileProviderPackageName = useAndroidX() ? global.androidx.core.content : (<any>android).support.v4.content;
 
 function getIntent(type) {
@@ -12,18 +13,30 @@ function getIntent(type) {
   return intent;
 }
 function share(intent, subject) {
-  context = application.android.context;
-  subject = subject || "How would you like to share this?";
+  return new Promise(resolve => {
+    context = application.android.context;
+    subject = subject || "How would you like to share this?";
 
-  const shareIntent = android.content.Intent.createChooser(intent, subject);
-  shareIntent.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-  context.startActivity(shareIntent);
+    const shareIntent = android.content.Intent.createChooser(intent, subject);
+    shareIntent.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+    // context.startActivity(shareIntent);
+
+    const activity = <android.app.Activity>context
+    activity.onActivityResult = (requestCode: number, resultCode: number, data: android.content.Intent) => {
+      if (requestCode === REQUEST_CODE)
+        if (resultCode === android.app.Activity.RESULT_OK)
+          resolve(true)
+        else if (resultCode === android.app.Activity.RESULT_CANCELED)
+          resolve(false)
+    }
+    activity.startActivityForResult(shareIntent, REQUEST_CODE)
+  })
 }
 function useAndroidX () {
   return global.androidx && global.androidx.appcompat;
 }
 
-export function shareImage(image, subject) {
+export async function shareImage(image, subject) {
   numberOfImagesCreated ++;
 
   context = application.android.context;
@@ -51,21 +64,21 @@ export function shareImage(image, subject) {
   }
   intent.putExtra(android.content.Intent.EXTRA_STREAM, shareableFileUri);
 
-  share(intent, subject);
+  return await share(intent, subject);
 }
 
-export function shareText(text, subject) {
+export async function shareText(text, subject) {
   const intent = getIntent("text/plain");
 
   intent.putExtra(android.content.Intent.EXTRA_TEXT, text);
-  share(intent, subject);
+  return await share(intent, subject);
 }
 
-export function shareUrl(url, text, subject) {
+export async function shareUrl(url, text, subject) {
   const intent = getIntent("text/plain");
 
   intent.putExtra(android.content.Intent.EXTRA_TEXT, url);
   intent.putExtra(android.content.Intent.EXTRA_SUBJECT, text);
 
-  share(intent, subject);
+  return await share(intent, subject);
 }
